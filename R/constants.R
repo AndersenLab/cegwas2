@@ -4,4 +4,4 @@
 #'
 #' @export
 
-cendr_dataset_release <- 20170531
+cendr_dataset_release <- 20180527
