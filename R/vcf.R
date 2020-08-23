@@ -60,9 +60,18 @@ query_vcf <- function(...,
 
     # Ensure that bcftools is available:
     conn <- pipe("bcftools --version")
-    bcftools_version <- as.double(stringr::str_extract(readLines(conn)[1], "[0-9]+\\.[0-9]+"))
+    
+    # don't change to double here
+    bcftools_version <- stringr::str_extract(readLines(conn)[1], 
+                                                       "[0-9]+\\.[0-9]+")
     close(conn)
-    assertthat::assert_that(!(is.na(bcftools_version) | bcftools_version < 1.2),
+    
+    # change to double here
+    bcftools_vA <- as.numeric(stringr::str_split_fixed(bcftools_version, "\\.", 2)[,1])
+    bcftools_vB <- as.numeric(stringr::str_split_fixed(bcftools_version, "\\.", 2)[,2])
+    # assertthat::assert_that(!(is.na(bcftools_version) | bcftools_version < 
+    #                               1.2), msg = "bcftools 1.2+ required for this query_vcf")
+    assertthat::assert_that(!(is.na(bcftools_version) | bcftools_vA < 1 | bcftools_vA == 1 & bcftools_vB < 2), 
                             msg = "bcftools 1.2+ required for this query_vcf")
 
 
