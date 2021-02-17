@@ -265,9 +265,51 @@ process_phenotypes <- function(df,
         dplyr::ungroup() %>%
         tidyr::gather(trait, phenotype, -strain, -isotype) %>%
         dplyr::filter(!is.na(phenotype))
+    
+    # deal with multiple strains per isotype group
+    test <- df_isotypes_resolved %>%
+        dplyr::group_by(isotype) %>%
+        dplyr::mutate(num = length(unique(strain))) %>% 
+        dplyr::mutate(ref_strain = strain == isotype)
+    no_issues <- test %>%
+        dplyr::filter(num == 1 & ref_strain == T)
+    issues <- test %>%
+        dplyr::filter(num > 1 | ref_strain == F) 
+    
+    fixed_issues <- no_issues %>%
+        dplyr::select(-num, -ref_strain)
+    
+    # go through each isotype issue and resolve it
+    for(i in unique(issues$isotype)) {
+        df <- issues %>%
+            dplyr::filter(isotype == i)
+        
+        # if only one strain is phenotyped, just rename strain to isotype ref strain and flag
+        if(nrow(df) == 1) {
+            fix <- df %>%
+                dplyr::mutate(strain = isotype)
+            message(glue::glue("Non-isotype reference strain {df$strain[1]} renamed to isotype {i}."))
+        } else {
+            # remove non-isotype strains
+            fix <- df %>%
+                dplyr::filter(ref_strain) %>%
+                dplyr::select(-ref_strain, -num)
+            
+            # warn the user
+            if(sum(df$ref_strain) > 0) {
+                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain), collapse = ', ')} from isotype group {i} removed."))
+            } 
+            else {
+                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain), collapse = ', ')} from isotype group {i} removed.
+                               To include this isotype in the analysis, you can (1) phenotype {i} or (2) evaluate the similarity of these strains and choose one representative for the group."))
+            }
+        }
+        # add to data
+        fixed_issues <- rbind(fixed_issues, fix)
+    }
 
     # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ # Summarize Replicate Data # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ #
-    df_replicates_summarized <- df_isotypes_resolved %>%
+    df_replicates_summarized <- fixed_issues %>%
         dplyr::group_by(isotype, trait) %>% {
             if (summarize_replicates == "mean") dplyr::summarise(., phenotype = mean( phenotype, na.rm = T ) )
             else if (summarize_replicates == "median") dplyr::summarise(., phenotype = median( phenotype, na.rm = T ) )
