@@ -2,7 +2,7 @@
 generate_isotype_lookup <- function(species = "ce") {
 
     if ( species == "ce" ) {
-        isotype_lookup <- dplyr::collect(get_db("strain")) %>%
+        isotype_lookup <- dplyr::collect(cegwas2::get_db("strain")) %>%
             dplyr::mutate(strain_names = ifelse(!is.na( previous_names ),
                                                 paste( strain, previous_names, sep = "|" ),
                                                 strain )) %>%
@@ -222,7 +222,7 @@ BAMF_prune <- function(data, remove_outliers = TRUE ){
 #' isotype names, summarizes replicate data, and eliminates outliers.
 #'
 #' @param df a dataframe with a strain column and columns for each trait for processing.
-#' @param summarize_replicates summarization method, currently limited to "mean" or "median"
+#' @param summarize_replicates summarization method, currently limited to "mean" or "median" (or "none" for no summarizing - use for H2 calculation)
 #' @param prune_method method for eliminating outliers, currently limited to "BAMF", "Z", "TUKEY", "MAD"
 #' @param remove_outliers boolean to specify if outliers should be eliminated within the function.
 #' If FALSE, additional columns will be output specifying if the strain phenotype is an outier.
@@ -285,9 +285,10 @@ process_phenotypes <- function(df,
             dplyr::filter(isotype == i)
         
         # if only one strain is phenotyped, just rename strain to isotype ref strain and flag
-        if(nrow(df) == 1) {
+        if(length(unique(df$strain)) == 1) {
             fix <- df %>%
-                dplyr::mutate(strain = isotype)
+                dplyr::mutate(strain = isotype) %>%
+                dplyr::select(-ref_strain, -num)
             message(glue::glue("Non-isotype reference strain {df$strain[1]} renamed to isotype {i}."))
         } else {
             # remove non-isotype strains
@@ -297,10 +298,10 @@ process_phenotypes <- function(df,
             
             # warn the user
             if(sum(df$ref_strain) > 0) {
-                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain), collapse = ', ')} from isotype group {i} removed."))
+                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain) %>% unique(), collapse = ', ')} from isotype group {i} removed."))
             } 
             else {
-                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain), collapse = ', ')} from isotype group {i} removed.
+                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain) %>% unique(), collapse = ', ')} from isotype group {i} removed.
                                To include this isotype in the analysis, you can (1) phenotype {i} or (2) evaluate the similarity of these strains and choose one representative for the group."))
             }
         }
@@ -311,8 +312,9 @@ process_phenotypes <- function(df,
     # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ # Summarize Replicate Data # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ #
     df_replicates_summarized <- fixed_issues %>%
         dplyr::group_by(isotype, trait) %>% {
-            if (summarize_replicates == "mean") dplyr::summarise(., phenotype = mean( phenotype, na.rm = T ) )
-            else if (summarize_replicates == "median") dplyr::summarise(., phenotype = median( phenotype, na.rm = T ) )
+            if(summarize_replicates == "mean") dplyr::summarise(., phenotype = mean(as.numeric(phenotype), na.rm = T ) )
+            else if(summarize_replicates == "median") dplyr::summarise(., phenotype = median(as.numeric(phenotype), na.rm = T ) )
+            else if(summarize_replicates == "none") dplyr::mutate(., phenotype = as.numeric(phenotype))
             else  message(glue::glue("Please choose mean or median as options for summarizeing replicate data.")) } %>%
         dplyr::rename(strain = isotype) %>%
         dplyr::ungroup()
