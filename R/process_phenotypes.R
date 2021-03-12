@@ -222,7 +222,7 @@ BAMF_prune <- function(data, remove_outliers = TRUE ){
 #' isotype names, summarizes replicate data, and eliminates outliers.
 #'
 #' @param df a dataframe with a strain column and columns for each trait for processing.
-#' @param summarize_replicates summarization method, currently limited to "mean" or "median" (or "none" for no summarizing - use for H2 calculation)
+#' @param summarize_replicates summarization method, currently limited to "mean" or "median"
 #' @param prune_method method for eliminating outliers, currently limited to "BAMF", "Z", "TUKEY", "MAD"
 #' @param remove_outliers boolean to specify if outliers should be eliminated within the function.
 #' If FALSE, additional columns will be output specifying if the strain phenotype is an outier.
@@ -314,7 +314,7 @@ process_phenotypes <- function(df,
         dplyr::group_by(isotype, trait) %>% {
             if(summarize_replicates == "mean") dplyr::summarise(., phenotype = mean(as.numeric(phenotype), na.rm = T ) )
             else if(summarize_replicates == "median") dplyr::summarise(., phenotype = median(as.numeric(phenotype), na.rm = T ) )
-            else if(summarize_replicates == "none") dplyr::mutate(., phenotype = as.numeric(phenotype))
+            # else if(summarize_replicates == "none") dplyr::mutate(., phenotype = as.numeric(phenotype))
             else  message(glue::glue("Please choose mean or median as options for summarizeing replicate data.")) } %>%
         dplyr::rename(strain = isotype) %>%
         dplyr::ungroup()
